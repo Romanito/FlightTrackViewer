@@ -4,7 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Flight Logs</title>
+    <script src="js/jszip.min.js"></script>
     <script src="ol/ol.js"></script>
+    <script src="ol/kmz.js"></script>
     <link rel="stylesheet" href="ol/ol.css">
     <style>
         body {
@@ -31,13 +33,14 @@
 <body>
     <header>
         <select id="traceFiles">
-            <option value="0">Select a trace </option>
+            <option value="">Select a trace </option>
 <?php
     foreach (array_slice(scandir('./traces/'), 2) as $file) {
         echo "<option>$file</option>";
     }
 ?>
         </select>
+        <span id="statusMessage"></span>
     </header>
     <div id="map"></div>
     <script src="js/osm-embed.js"></script>
