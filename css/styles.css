@@ -1,0 +1,26 @@
+body {
+    display: flex;
+    flex-direction: column;
+    padding: 0;
+    margin: 0;
+    height: 100vh;
+}
+header {
+    display: flex;
+    align-items: center;
+    padding: 0.5em;
+    font: small-caption;
+}
+header > * {
+    margin-right: 1em;
+}
+#map {
+    flex: auto;
+}
+
+@media (prefers-color-scheme: dark) {
+    body, input, select {
+        color: white;
+        background-color: #3b3b3b;
+    }
+}

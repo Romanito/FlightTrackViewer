@@ -1,0 +1,1 @@
+var bingMapKey = "Insert your Bing Maps key here";

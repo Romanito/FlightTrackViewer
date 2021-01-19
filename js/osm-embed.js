@@ -1,27 +1,48 @@
-var pageTitle = "Flight Logs"
+var pageTitle = "Flight Tracks"
 var map = null;
-var traceLayer = null;
+var trackLayer = null;
 var statusMessage = document.getElementById("statusMessage");
+var savedView = null;
 
-// traceFiles selection box
-var traceFiles = document.getElementById("traceFiles");
-traceFiles.addEventListener("change", e => {
-    history.pushState(null, null, "?trace=" + traceFiles.value);
-    loadSelectedTrace();
+// trackFiles selection box
+var trackFiles = document.getElementById("trackFiles");
+trackFiles.addEventListener("change", e => {
+    history.pushState(null, null, "?track=" + trackFiles.value);
+    loadSelectedTrack();
 });
 
-// Enables navigating traces via history
+// trackFiles selection box
+var tileSources = document.getElementById("tileSources");
+tileSources.addEventListener("change", e => {
+    // Saves the current view
+    savedView = map.getView();
+    // Erases the current map and recreates it with the new tile source
+    map = null;
+    let mapDiv = document.getElementById("map");
+    while (mapDiv.firstChild) mapDiv.removeChild(mapDiv.firstChild);
+    loadSelectedTrack();
+    // Saves the preference
+    localStorage.tileSource = tileSources.value;
+});
+
+// Enables navigating tracks via history
 window.addEventListener("popstate", e => {
-    setTraceFromQuerystring();
+    setTrackFromQuerystring();
 });
 
-setTraceFromQuerystring();
+loadPreferences();
+setTrackFromQuerystring();
 
-// Reads the query string and sets the traceFiles value
-function setTraceFromQuerystring() {
-    let traceFile = getQueryStringParams()["trace"];
-    traceFiles.value = traceFile || "";
-    loadSelectedTrace();
+// Loads preferences (duh)
+function loadPreferences() {
+    tileSources.value = localStorage.tileSource || "OSM";
+}
+
+// Reads the query string and sets the trackFiles value
+function setTrackFromQuerystring() {
+    let trackFile = getQueryStringParams()["track"];
+    trackFiles.value = trackFile || "";
+    loadSelectedTrack();
 }
 
 // Converts the query string to an associative array
@@ -38,49 +59,49 @@ function getQueryStringParams() {
         : {};
 };
 
-// Loads the selected trace to the map
-function loadSelectedTrace() {
-    
+// Loads the selected track to the map
+function loadSelectedTrack() {
+
     statusMessage.textContent = "";
-    
+
     // Clears existing layer
-    if (traceLayer != null) {
-        map.removeLayer(traceLayer);
-        traceLayer = null;
+    if (trackLayer != null) {
+        map?.removeLayer(trackLayer);
+        trackLayer = null;
     }
 
-    // Selected trace file
-    let traceFile = traceFiles.value;
-    document.title = traceFile ? pageTitle + " | " + traceFile : pageTitle;
-    if (!traceFile)
+    // Selected track file
+    let trackFile = trackFiles.value;
+    document.title = trackFile ? pageTitle + " | " + trackFile : pageTitle;
+    if (!trackFile)
         return;
 
-    // Trace format depends on file extension
-    let traceFormat, formatOptions = { extractStyles: false, showPointNames: false };
-    if (traceFile.endsWith(".kml"))
-        traceFormat = new ol.format.KML(formatOptions);
-    else if (traceFile.endsWith(".kmz"))
-        traceFormat = new KMZ(formatOptions);
-    else if (traceFile.endsWith(".gpx"))
-        traceFormat = new ol.format.GPX(formatOptions);
+    // Track format depends on file extension
+    let trackFormat, formatOptions = { extractStyles: false, showPointNames: false };
+    if (trackFile.endsWith(".kml"))
+        trackFormat = new ol.format.KML(formatOptions);
+    else if (trackFile.endsWith(".kmz"))
+        trackFormat = new KMZ(formatOptions);
+    else if (trackFile.endsWith(".gpx"))
+        trackFormat = new ol.format.GPX(formatOptions);
     else {
         alert("Unsupported file format");
         return;
     }
-    
+
     statusMessage.textContent = "Loading...";
 
-    // Layer source (refers trace file)
+    // Layer source (refers track file)
     /*let layerSource;
-    if (traceFile.endsWith(".kmz")) {
+    if (trackFile.endsWith(".kmz")) {
         layerSource = new ol.source.Vector({
-            format: traceFormat,
+            format: trackFormat,
             // KMZ loader
             loader: function(extent, resolution, projection) {
                 let onError = function() {
                     layerSource.removeLoadedExtent(extent);
                 }
-                fetch("traces/" + traceFile)
+                fetch("tracks/" + trackFile)
                 .then(response => {
                     if (response.ok) {
                         return response.blob();
@@ -106,19 +127,19 @@ function loadSelectedTrace() {
     }
     else {
         layerSource = new ol.source.Vector({
-            format: traceFormat,
-            url: "traces/" + traceFile
+            format: trackFormat,
+            url: "tracks/" + trackFile
         });
     }*/
 
 
-    // Layer source (refers trace file)
+    // Layer source (refers track file)
     let layerSource = new ol.source.Vector({
-        url: "traces/" + traceFile,
-        format: traceFormat
+        url: "tracks/" + trackFile,
+        format: trackFormat
     });
 
-    // Trace stroke style
+    // Track stroke style
     let layerStyle = [
         new ol.style.Style({
             stroke: new ol.style.Stroke({
@@ -134,8 +155,8 @@ function loadSelectedTrace() {
         })
     ];
 
-    // Trace layer
-    traceLayer = new ol.layer.Vector({
+    // Track layer
+    trackLayer = new ol.layer.Vector({
         source: layerSource,
         style: layerStyle
     });
@@ -144,19 +165,28 @@ function loadSelectedTrace() {
     let styleDeparture = new ol.style.Style({ text: new ol.style.Text({ text: "🛫", scale: [3, 3] }) });
     let styleArrival = new ol.style.Style({ text: new ol.style.Text({ text: "🛬", scale: [3, 3] }) });
 
+    // Tile source
+    let tileSource;
+    switch (tileSources.value) {
+        case "BingMaps":
+            tileSource = new ol.source.BingMaps({
+                key: bingMapKey,
+                imagerySet: 'AerialWithLabelsOnDemand'
+            })
+            break;
+        case "Stamen":
+            tileSource = new ol.source.Stamen({layer: 'terrain'});
+            break;
+        default:
+            tileSource = new ol.source.OSM();
+            break;
+    }
+
     // Map creation
     if (!map) {
         map = new ol.Map({
             target: 'map',
-            layers: [
-                new ol.layer.Tile({
-                    source: new ol.source.OSM()
-                    /*source: new ol.source.BingMaps({
-                        key: 'bing maps key',
-                        imagerySet: 'AerialWithLabelsOnDemand'
-                    })*/
-                })
-            ],
+            layers: [new ol.layer.Tile({ source: tileSource })],
             view: new ol.View({
                 center: ol.proj.fromLonLat([37.41, 8.82]),
                 zoom: 4
@@ -165,23 +195,30 @@ function loadSelectedTrace() {
     }
 
     // Add the Layer with the GPX Track
-    map.addLayer(traceLayer);
+    map.addLayer(trackLayer);
 
     layerSource.once('change', function (e) {
         try {
             if (layerSource.getState() === 'ready') {
-                // Zooms in on the trace
-                map.getView().fit(layerSource.getExtent(), { padding: [50, 50, 50, 50] });
                 
+                // Sets the view
+                if (savedView) {
+                    map.setView(savedView);
+                    savedView = null;
+                }
+                else
+                    // Zooms in on the track
+                    map.getView().fit(layerSource.getExtent(), { padding: [50, 50, 50, 50] });
+
                 // Departure node
                 layerSource.getFeatureById(1)?.setStyle(styleDeparture);
-                
+
                 // Looking for arrival node id
                 let arrivalId = layerSource.getFeatures().length;
                 while (!layerSource.getFeatureById(arrivalId) && arrivalId > 1) arrivalId--;
                 if (arrivalId > 1) layerSource.getFeatureById(arrivalId).setStyle(styleArrival);
             }
-        } finally {            
+        } finally {
             statusMessage.textContent = "";
         }
     });
